@@ -79,7 +79,7 @@ class ImgDataset(Dataset):
         }
     """
 
-    LABEL_NAME = "labels"
+    LABEL_NAME = "labels.json"
 
     def __init__(self, data_dir: str):
         super().__init__(data_dir)
