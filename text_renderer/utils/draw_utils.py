@@ -3,6 +3,7 @@ from typing import Tuple, Union
 from PIL import ImageDraw, Image
 from PIL.Image import Image as PILImage
 import numpy as np
+import imgaug as ia
 
 from text_renderer.utils.font_text import FontText
 
@@ -88,9 +89,27 @@ def draw_text_on_bg(
 
     if font_text.horizontal:
         y_offset = font_text.offset[1]
-        for i, c in enumerate(font_text.text):
-            draw.text((c_x, c_y - y_offset), c, fill=text_color, font=font_text.font)
+
+        bb = []
+
+        for i, char in enumerate(font_text.text):
+            draw.text((c_x, c_y - y_offset), char, fill=text_color, font=font_text.font)
             c_x += chars_size[i][0] + char_spacings[i]
+
+            # ignore spaces
+            if char == ' ':
+                continue
+            
+            bottom_1 = font_text.getsize(text[i])[1]
+            right, bottom_2 = font_text.getsize(text[:i+1])
+            bottom = bottom_1 if bottom_1 < bottom_2 else bottom_2
+            width, height = font_text.getmask(char).size
+            right += xy[0]
+            bottom += xy[1]
+            top = bottom - height
+            left = right - width
+            bb.append(ia.BoundingBox(x1=left, y1=top, x2=right, y2=bottom))
+
     else:
         x_offset = font_text.offset[0]
         for i, c in enumerate(font_text.text):
@@ -98,7 +117,7 @@ def draw_text_on_bg(
             c_y += chars_size[i][1] + char_spacings[i]
         text_mask = text_mask.rotate(90, expand=True)
 
-    return text_mask
+    return text_mask, bb
 
 
 def _draw_text_on_bg(
@@ -133,5 +152,24 @@ def _draw_text_on_bg(
         fill=text_color,
         anchor=None,
     )
+    bb = []
+    for i, char in enumerate(font_text.text):
+        # draw.text((c_x, c_y - y_offset), char, fill=text_color, font=font_text.font)
+        # c_x += chars_size[i][0] + char_spacings[i]
 
-    return text_mask
+        # ignore spaces
+        if char == ' ':
+            continue
+        
+        bottom_1 = font_text.font.getsize(font_text.text[i])[1]
+        right, bottom_2 = font_text.font.getsize(font_text.text[:i+1])
+        bottom = bottom_1 if bottom_1 < bottom_2 else bottom_2
+        width, height = font_text.font.getmask(char).size
+        right += xy[0]
+        bottom += xy[1]
+        top = bottom - height
+        left = right - width
+        bb.append(ia.BoundingBox(x1=left, y1=top, x2=right, y2=bottom))
+
+
+    return text_mask, bb

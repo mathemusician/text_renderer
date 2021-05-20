@@ -5,6 +5,7 @@ from typing import Dict
 import lmdb
 import cv2
 import numpy as np
+from help import pickle
 
 
 class Dataset:
@@ -78,7 +79,7 @@ class ImgDataset(Dataset):
         }
     """
 
-    LABEL_NAME = "labels.json"
+    LABEL_NAME = "labels"
 
     def __init__(self, data_dir: str):
         super().__init__(data_dir)
@@ -87,18 +88,22 @@ class ImgDataset(Dataset):
             os.makedirs(self._img_dir)
         self._label_path = os.path.join(data_dir, self.LABEL_NAME)
 
-        self._data = {"num-samples": 0, "labels": {}, "sizes": {}}
+        self._data = {"num-samples": 0, "labels": {}, "sizes": {}, "bounding boxes": {}}
+        '''
         if os.path.exists(self._label_path):
             with open(self._label_path, "r", encoding="utf-8") as f:
                 self._data = json.load(f)
+        '''
 
-    def write(self, name: str, image: np.ndarray, label: str):
+    def write(self, name: str, image: np.ndarray, label: str, bbs):
         img_path = os.path.join(self._img_dir, name + ".jpg")
         cv2.imwrite(img_path, image, self.encode_param())
         self._data["labels"][name] = label
 
         height, width = image.shape[:2]
         self._data["sizes"][name] = (width, height)
+
+        self._data["bounding boxes"][name] = bbs
 
     def read(self, name: str) -> Dict:
         img_path = os.path.join(self._img_dir, name + ".jpg")
@@ -117,8 +122,11 @@ class ImgDataset(Dataset):
         self._data["num-samples"] = count
 
     def close(self):
+        '''
         with open(self._label_path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
+        '''
+        pickle(self._data, self._label_path)
 
 
 class LmdbDataset(Dataset):

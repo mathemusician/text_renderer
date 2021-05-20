@@ -1,4 +1,4 @@
-opencv-python==3.4.5.20
+
 fontTools==4.12.1
 lmdb==0.98
 pillow==6.2.2

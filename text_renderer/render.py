@@ -47,20 +47,21 @@ class Render:
     def __call__(self, *args, **kwargs) -> Tuple[np.ndarray, str]:
         try:
             if self._should_apply_layout():
-                img, text = self.gen_multi_corpus()
+                img, text, bbs = self.gen_multi_corpus()
             else:
-                img, text = self.gen_single_corpus()
+                img, text, bbs = self.gen_single_corpus()
 
             if self.cfg.render_effects is not None:
                 img, _ = self.cfg.render_effects.apply_effects(
                     img, BBox.from_size(img.size)
                 )
 
+
             img = img.convert("RGB")
             np_img = np.array(img)
             np_img = cv2.cvtColor(np_img, cv2.COLOR_RGB2BGR)
             np_img = self.norm(np_img)
-            return np_img, text
+            return np_img, text, bbs
         except Exception as e:
             logger.exception(e)
             raise e
@@ -71,7 +72,8 @@ class Render:
         bg = self.bg_manager.get_bg()
         text_color = self.corpus.cfg.text_color_cfg.get_color(bg)
 
-        text_mask = draw_text_on_bg(
+        bbs = []
+        text_mask, bb = draw_text_on_bg(
             font_text, text_color, char_spacing=self.corpus.cfg.char_spacing
         )
 
@@ -98,8 +100,9 @@ class Render:
             transformed_text_mask = text_mask
 
         img = self.paste_text_mask_on_bg(bg, transformed_text_mask)
+        bbs.append(bb)
 
-        return img, font_text.text
+        return img, font_text.text, bb
 
     def gen_multi_corpus(self) -> Tuple[PILImage, str]:
         font_texts: List[FontText] = [it.sample() for it in self.corpus]
@@ -110,7 +113,7 @@ class Render:
         if self.cfg.text_color_cfg is not None:
             text_color = self.cfg.text_color_cfg.get_color(bg)
 
-        text_masks, text_bboxes = [], []
+        text_masks, text_bboxes, bbs = [], [], []
         for i in range(len(font_texts)):
             font_text = font_texts[i]
 
@@ -118,7 +121,7 @@ class Render:
                 _text_color = self.corpus[i].cfg.text_color_cfg.get_color(bg)
             else:
                 _text_color = text_color
-            text_mask = draw_text_on_bg(
+            text_mask, bb = draw_text_on_bg(
                 font_text, _text_color, char_spacing=self.corpus[i].cfg.char_spacing
             )
 
@@ -129,6 +132,7 @@ class Render:
                     text_mask, text_bbox = effects.apply_effects(text_mask, text_bbox)
             text_masks.append(text_mask)
             text_bboxes.append(text_bbox)
+            bbs.append(bb)
 
         text_mask_bboxes, merged_text = self.layout(
             font_texts,
@@ -164,7 +168,7 @@ class Render:
 
         img = self.paste_text_mask_on_bg(bg, transformed_text_mask)
 
-        return img, merged_text
+        return img, merged_text, bbs
 
     def paste_text_mask_on_bg(
         self, bg: PILImage, transformed_text_mask: PILImage
